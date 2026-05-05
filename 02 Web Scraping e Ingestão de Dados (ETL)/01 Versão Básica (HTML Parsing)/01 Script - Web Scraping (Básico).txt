@@ -1,0 +1,46 @@
+# Importar as bibliotecas necessárias
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+
+#---------------------------
+# Corpo principal da aplicação
+#----------------------------
+
+# Endereço onde iremos buscar os dados a serem 'raspados'
+url = 'http://books.toscrape.com/'
+
+# Executar a chamada ao endereço carregado na variavel url, carregando o resultado para a variavel pagina
+pagina = requests.get(url)
+
+# Traduzir o conteudo de 'pagina' para o formato html
+soup = BeautifulSoup(pagina.content, 'html.parser')
+
+# Filtro do html separando efetivamente os blocos de produtos
+lista_produtos_html = soup.find_all('article', class_='product_pod')
+
+# Criar uma lista vazia para guardar nossos dados
+dados_extraidos = []
+
+# Varrer cada item encontrado para tirar Título e Preço
+for produto in lista_produtos_html:
+    # Pegar o titulo
+    titulo = produto.find('h3').find('a')['title']
+    
+    # Pegar o preço
+    preco = produto.find('p', class_='price_color').text
+    
+    # Adicionar na nossa lista
+    dados_extraidos.append({
+        'Nome do Livro': titulo, 
+        'Preço': preco
+    })
+
+#------------------------------------------------------------------
+
+# Tecnologia: Transformar a lista de dados para um dataframe, usando a biblioteca de pandas
+dataframe = pd.DataFrame(dados_extraidos)
+
+#Salva a tabela do dataframe em uma planilha excel
+dataframe.to_csv('relatorio_livros_toscrape.csv', index=False, encoding='utf-8-sig')
+

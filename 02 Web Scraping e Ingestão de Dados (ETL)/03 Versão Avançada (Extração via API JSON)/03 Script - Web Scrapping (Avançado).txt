@@ -1,0 +1,98 @@
+import requests
+import pandas as pd
+import time
+
+# --- CONFIGURAÇÕES ---
+# URL da API "secreta" que entrega os dados limpos
+base_url = 'https://www.maxtitanium.com.br/api/catalog_system/pub/products/search'
+
+# Headers para simular um navegador real
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json'
+}
+
+# Listas para controle
+todos_produtos = []
+inicio = 0
+passo = 49 # A API entrega de 50 em 50
+continuar = True
+
+print("🚀 Iniciando a extração completa do catálogo...")
+
+# --- LOOP DE EXTRAÇÃO (PÁGINA POR PÁGINA) ---
+while continuar:
+    fim = inicio + passo
+    url_paginada = f"{base_url}?_from={inicio}&_to={fim}"
+    
+    print(f"Baixando produtos {inicio} a {fim}...")
+    
+    try:
+        response = requests.get(url_paginada, headers=headers)
+
+if response.status_code == 200:
+            lista = response.json()
+            
+            # Se a lista vier vazia, acabaram os produtos
+            if not lista:
+                print("🏁 Fim da lista de produtos.")
+                continuar = False
+                break
+            
+            # Processa cada produto
+            for item in lista:
+                try:
+                    nome = item.get('productName')
+                    link = item.get('link')
+                    
+                    # Lógica para pegar preço e estoque
+                    items = item.get('items', [])
+                    preco = 0
+                    estoque = "Indisponível"
+
+if items:
+                        sku = items[0]
+                        sellers = sku.get('sellers', [])
+                        if sellers:
+                            oferta = sellers[0].get('commertialOffer', {})
+                            preco = oferta.get('Price')
+                            qtd = oferta.get('AvailableQuantity', 0)
+                            estoque = "Disponível" if qtd > 0 else "Esgotado"
+                    
+                    # Adiciona na lista final
+                    todos_produtos.append({
+                        'Nome': nome,
+                        'Preço': str(preco).replace('.', ','), # Ajuste para Excel Brasil (virgula decimal)
+                        'Status': estoque,
+                        'Link': link
+                    })
+                except:
+                    continue
+
+ # Prepara para a próxima página
+            inicio += 50
+            time.sleep(1) # Pausa rápida para não travar
+            
+        else:
+            print(f"Erro na requisição: {response.status_code}")
+            continuar = False
+
+    except Exception as e:
+        print(f"Erro: {e}")
+        continuar = False
+
+# --- SALVANDO O ARQUIVO CORRIGIDO ---
+if todos_produtos:
+    df_completo = pd.DataFrame(todos_produtos)
+    
+    # Remove duplicatas
+    df_completo = df_completo.drop_duplicates(subset=['Nome'])
+    
+    print(f"\n✅ SUCESSO TOTAL! {len(df_completo)} produtos extraídos.")
+    display(df_completo.head())
+
+# O PULO DO GATO: sep=';' para o Excel abrir as colunas certinhas
+    nome_arquivo = 'catalogo_maxtitanium_final.csv'
+    df_completo.to_csv(nome_arquivo, index=False, sep=';', encoding='utf-8-sig')
+    
+    print(f"\n📁 Arquivo salvo como: {nome_arquivo}")
